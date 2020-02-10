@@ -1,2 +1,2 @@
-*.sh linguist-language=cpp
-* linguist-language=cpp
+*.sh linguist-language=c
+* linguist-language=c
