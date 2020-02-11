@@ -42,11 +42,10 @@ int main( int argc, char * argv[] )
         if ( !stop )
         {
             memset( &msg, 0, sizeof(msg) );
-            /* fgets( msg.msg_text, MSG_TEXT_SIZE, stdin ); */
             strcpy( msg.msg_text, argv[1] );
 
-            /* msg.msg_text[ strlen(msg.msg_text) - 1 ] = 0; */
-            msg.msg_type = 1;
+            msg.msg_type = MSG_CMD_TYPE;
+
             if ( ( rc = msgsnd( msgid, (void *)&msg, MSG_TEXT_SIZE, 0 ) ) == -1 )
             {
                 stop = 1;
@@ -54,14 +53,40 @@ int main( int argc, char * argv[] )
             }
             else
             {
-                if ( strncmp( msg.msg_text, "end", 3 ) == 0 )
+                if ( strncmp( msg.msg_text, "list", 4 ) == 0 )
+                {
+                    struct MyMsgStruct msg_info;
+                    memset( &msg_info, 0, sizeof(msg_info) );
+                    do
+                    {
+                        if ( ( rc = msgrcv( msgid, &msg_info, MSG_TEXT_SIZE, 0, 0 ) ) == -1 ) break;
+                        printf(msg_info.msg_text);
+                    }
+                    while ( msg_info.msg_type == MSG_CONTINUE_TYPE );
+                }
+                else if ( strncmp( msg.msg_text, "new", 3 ) == 0 )
                 {
                     stop = 1;
-                    printf("End manager process!\n");
+                    struct MyMsgStruct msg_info;
+                    memset( &msg_info, 0, sizeof(msg_info) );
+                    do
+                    {
+                        if ( ( rc = msgrcv( msgid, &msg_info, MSG_TEXT_SIZE, 0, 0 ) ) == -1 ) break;
+                        printf(msg_info.msg_text);
+                    }
+                    while ( msg_info.msg_type == MSG_CONTINUE_TYPE );
                 }
                 else if ( strncmp( msg.msg_text, "exit", 4 ) == 0 )
                 {
                     stop = 1;
+                    struct MyMsgStruct msg_info;
+                    memset( &msg_info, 0, sizeof(msg_info) );
+                    do
+                    {
+                        if ( ( rc = msgrcv( msgid, &msg_info, MSG_TEXT_SIZE, 0, 0 ) ) == -1 ) break;
+                        printf(msg_info.msg_text);
+                    }
+                    while ( msg_info.msg_type == MSG_CONTINUE_TYPE );
                 }
             }
         }
@@ -69,4 +94,3 @@ int main( int argc, char * argv[] )
 
     return 0;
 }
-

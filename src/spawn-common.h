@@ -1,12 +1,15 @@
-#ifndef __STRING_HASH_H__
+﻿#ifndef __STRING_HASH_H__
 #define __STRING_HASH_H__
 
-#define MSG_TEXT_SIZE 64
+#define MSG_TEXT_SIZE (64 - sizeof(long))
 struct MyMsgStruct
 {
     long msg_type;
     char msg_text[MSG_TEXT_SIZE];
 };
+#define MSG_CMD_TYPE 1
+#define MSG_END_TYPE 2
+#define MSG_CONTINUE_TYPE 3
 
 /* ELF Hash Function */
 static unsigned int elf_hash( char const * str, int size )

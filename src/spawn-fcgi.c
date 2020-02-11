@@ -154,6 +154,16 @@ key_t get_msg_key()
     return msg_key;
 }
 
+int peek_message( int msgid, long msg_type )
+{
+    int result;
+    if ( ( result = msgrcv( msgid, NULL, 0, msg_type, IPC_NOWAIT) ) == -1 )
+    {
+        if ( errno == E2BIG )
+            return 1;
+    }
+    return 0;
+}
 /* Judge pid process is exist ? and delete isnt exist pid. */
 void clear_invalid_pids()
 {
@@ -353,14 +363,14 @@ static int bind_socket( const char *addr, unsigned short port, const char *unixs
 }
 
 /* spawn fcgi processes */
-static int fcgi_spawn_connection( char *app_path, char **app_argv, int fcgi_fd, int fork_count, int child_count, int pid_fd, int nofork )
+static int fcgi_spawn_connection( char *app_path, char **app_argv, int fcgi_fd, pid_t * children, int fork_count, int child_count, int pid_fd, int nofork )
 {
     int status, rc = 0;
     struct timeval tv_wait_time = { 0, 100 * 1000 }; /* 100ms */
-
     pid_t child;
+    int ifork;
 
-    while ( fork_count-- > 0 )
+    for ( ifork = 0; ifork < fork_count; ++ifork )
     {
         if ( !nofork )
         {
@@ -395,8 +405,9 @@ static int fcgi_spawn_connection( char *app_path, char **app_argv, int fcgi_fd, 
                 }
                 else if ( __port > 0 )
                 {
-                    struct sockaddr_in addr_in = { 0 };
+                    struct sockaddr_in addr_in;
                     socklen_t len = sizeof(addr_in);
+                    memset( &addr_in, 0, sizeof(addr_in) );
                     getsockname( fcgi_fd, (struct sockaddr *)&addr_in, (socklen_t *)&len );
                     snprintf( env_fastdo_fpm_listen, sizeof(env_fastdo_fpm_listen), "FASTDO_FPM_LISTEN=%s:%u", inet_ntoa(addr_in.sin_addr), ntohs(addr_in.sin_port) );
                     putenv(env_fastdo_fpm_listen);
@@ -469,6 +480,7 @@ static int fcgi_spawn_connection( char *app_path, char **app_argv, int fcgi_fd, 
             switch ( waitpid( child, &status, WNOHANG ) )
             {
             case 0: /* 0 mean's child is running... */
+                if ( children ) children[ifork] = child;
                 fprintf( stdout, "spawn-fcgi: child spawned successfully: PID: %d\n", child );
 
                 /* write pid file */
@@ -629,6 +641,7 @@ static void sigterm_handler( int signo )
 {
     __stop = 1;
     fprintf( stdout, "SIG_TERM from pid=%d\n", getpid() );
+    (void)signo;
 }
 
 static void sigchld_handler( int signo, siginfo_t *si, void *p )
@@ -643,8 +656,10 @@ static void sigchld_handler( int signo, siginfo_t *si, void *p )
             fprintf( stdout, "SIGCHLD from pid=%d uid=%d, IGNORED\n", si->si_pid, si->si_uid );
             return; /* someone send use fake SIGCHLD */
         case CLD_KILLED:
-            fprintf( stdout, "child %d killed by signal %s\n", si->si_pid, __signame[ WTERMSIG(si->si_status) ] );
-            fcgi_spawn_connection( __fcgi_app, __fcgi_app_argv, __fcgi_fd, 1, __child_count, __pid_fd, __nofork );
+            /* fprintf( stdout, "child %d killed by signal %s\n", si->si_pid, __signame[ WTERMSIG(si->si_status) ] ); */
+            fprintf( stdout, "child %d killed by signal %s\n", child, __signame[ WTERMSIG(__status) ] );
+            if ( !__stop )
+                fcgi_spawn_connection( __fcgi_app, __fcgi_app_argv, __fcgi_fd, NULL, 1, __child_count, __pid_fd, __nofork );
             break;
         case CLD_TRAPPED:
             fprintf( stdout, "child %d trapped\n", si->si_pid );
@@ -660,14 +675,18 @@ static void sigchld_handler( int signo, siginfo_t *si, void *p )
             return;
         case CLD_DUMPED:
             fprintf( stdout, "child %d coredumped by signal %s\n", child, __signame[ WTERMSIG(si->si_status) ] );
-            fcgi_spawn_connection( __fcgi_app, __fcgi_app_argv, __fcgi_fd, 1, __child_count, __pid_fd, __nofork );
+            if ( !__stop )
+                fcgi_spawn_connection( __fcgi_app, __fcgi_app_argv, __fcgi_fd, NULL, 1, __child_count, __pid_fd, __nofork );
             break;
         default:
             fprintf( stdout, "child %d default sig %d\n", si->si_pid, si->si_code );
-            fcgi_spawn_connection( __fcgi_app, __fcgi_app_argv, __fcgi_fd, 1, __child_count, __pid_fd, __nofork );
+            if ( !__stop )
+                fcgi_spawn_connection( __fcgi_app, __fcgi_app_argv, __fcgi_fd, NULL, 1, __child_count, __pid_fd, __nofork );
             break;
         }
     }
+    (void)signo;
+    (void)p;
 }
 
 static inline void rlimit_reset()
@@ -956,7 +975,7 @@ int main( int argc, char **argv )
             return -1;
     }
 
-    if ( __fcgi_dir && -1 == chdir(__fcgi_dir) ) 
+    if ( __fcgi_dir && -1 == chdir(__fcgi_dir) )
     {
         fprintf( stderr, "spawn-fcgi: chdir('%s') failed: %s\n", __fcgi_dir, strerror(errno) );
         return -1;
@@ -975,12 +994,12 @@ int main( int argc, char **argv )
         write( __pid_fd, pidbuf, strlen(pidbuf) );
     }
 
-    fcgi_spawn_connection( __fcgi_app, __fcgi_app_argv, __fcgi_fd, __fork_count, __child_count, __pid_fd, __nofork );
+    fcgi_spawn_connection( __fcgi_app, __fcgi_app_argv, __fcgi_fd, NULL, __fork_count, __child_count, __pid_fd, __nofork );
 
     {
         /* 接受第三方发送消息操作 */
         int mode = 0666;
-        int msgid, msg_to_receive;
+        int msgid, msg_type;
         struct MyMsgStruct msg;
 
         if ( ( msgid = msgget( get_msg_key(), mode | IPC_CREAT ) ) == -1 )
@@ -990,13 +1009,14 @@ int main( int argc, char **argv )
         else
         {
             int rc;
-            msg_to_receive = 0;
+            msg_type = MSG_CMD_TYPE;
 
             while ( !__stop )
             {
                 clear_invalid_pids();
+
                 memset( &msg, 0, sizeof(msg) );
-                if ( ( rc = msgrcv( msgid, (void *)&msg, MSG_TEXT_SIZE, msg_to_receive, 0 ) ) == -1 )
+                if ( ( rc = msgrcv( msgid, (void *)&msg, MSG_TEXT_SIZE, msg_type, 0 ) ) == -1 )
                 {
                     if ( errno != EINTR )
                         fprintf( stderr, "spawn-fcgi(pid:%u), msgrcv failed with error: %s\n", getpid(), strerror(errno) );
@@ -1005,28 +1025,58 @@ int main( int argc, char **argv )
                 {
                     if ( strncmp( msg.msg_text, "exit", 4 ) == 0 ) /* 退出spawn-fcgi进程 */
                     {
+                        struct MyMsgStruct msg_exit_info;
                         __stop = 1;
-                        if ( __unixsocket )
-                            printf( "Exit spawn-fcgi(%s) process!\n", __unixsocket );
-                        else if ( __port > 0 )
-                            printf( "Exit spawn-fcgi(%u) process!\n", __port );
 
                         for ( int i = 0; i < __fcgiserv_pids_count; ++i )
                         {
-                            kill( __fcgiserv_pids[i], SIGKILL );
-                            printf( "kill %d process...\n", __fcgiserv_pids[i] );
+                            kill( __fcgiserv_pids[i], SIGTERM );
+                            memset( &msg_exit_info, 0, sizeof(msg_exit_info) );
+                            snprintf( msg_exit_info.msg_text, MSG_TEXT_SIZE, "Kill %u fcgi process...\n", __fcgiserv_pids[i] );
+                            msg_exit_info.msg_type = MSG_CONTINUE_TYPE;
+                            msgsnd( msgid, &msg_exit_info, MSG_TEXT_SIZE, 0 );
                         }
+
+                        memset( &msg_exit_info, 0, sizeof(msg_exit_info) );
+                        if ( __unixsocket )
+                            snprintf( msg_exit_info.msg_text, MSG_TEXT_SIZE, "Exit spawn-fcgi(%s) process...\n", __unixsocket );
+                        else if ( __port > 0 )
+                            snprintf( msg_exit_info.msg_text, MSG_TEXT_SIZE, "Exit spawn-fcgi(%u) process...\n", __port );
+
+                        msg_exit_info.msg_type = MSG_END_TYPE;
+                        msgsnd( msgid, &msg_exit_info, MSG_TEXT_SIZE, 0 );
                     }
                     else if ( strncmp( msg.msg_text, "list", 4 ) == 0 )
                     {
-                        for ( int i = 0; i < __fcgiserv_pids_count; ++i )
+                        if ( __fcgiserv_pids_count > 0 )
                         {
-                            printf( "fcgi process: %d\n", __fcgiserv_pids[i] );
+                            for ( int i = 0; i < __fcgiserv_pids_count; ++i )
+                            {
+                                struct MyMsgStruct msg_fcgi_pid;
+                                memset( &msg_fcgi_pid, 0, sizeof(msg_fcgi_pid) );
+                                msg_fcgi_pid.msg_type = ( i == __fcgiserv_pids_count - 1 ? MSG_END_TYPE : MSG_CONTINUE_TYPE );
+                                snprintf( msg_fcgi_pid.msg_text, MSG_TEXT_SIZE, "%d\n", __fcgiserv_pids[i] );
+                                msgsnd( msgid, &msg_fcgi_pid, MSG_TEXT_SIZE, 0 );
+                            }
+                        }
+                        else
+                        {
+                            struct MyMsgStruct msg_no_fcgi;
+                            memset( &msg_no_fcgi, 0, sizeof(msg_no_fcgi) );
+                            msg_no_fcgi.msg_type = MSG_END_TYPE;
+                            strcpy( msg_no_fcgi.msg_text, "\n" );
+                            msgsnd( msgid, &msg_no_fcgi, MSG_TEXT_SIZE, 0 );
                         }
                     }
                     else if ( strncmp( msg.msg_text, "new", 3 ) == 0 )
                     {
-                        fcgi_spawn_connection( __fcgi_app, __fcgi_app_argv, __fcgi_fd, 1, __child_count, __pid_fd, __nofork );
+                        struct MyMsgStruct msg_new_child;
+                        pid_t new_child;
+                        memset( &msg_new_child, 0, sizeof(msg_new_child) );
+                        fcgi_spawn_connection( __fcgi_app, __fcgi_app_argv, __fcgi_fd, &new_child, 1, __child_count, __pid_fd, __nofork );
+                        msg_new_child.msg_type = MSG_END_TYPE;
+                        snprintf( msg_new_child.msg_text, MSG_TEXT_SIZE, "%d\n", new_child );
+                        msgsnd( msgid, &msg_new_child, MSG_TEXT_SIZE, 0 );
                     }
                     else
                     {
@@ -1035,7 +1085,14 @@ int main( int argc, char **argv )
                 }
             }
 
-            msgctl( msgid, IPC_RMID, 0 );
+            /* Wait for all messages to be read */
+            while ( peek_message( msgid, 0 ) )
+            {
+                usleep( 100 * 1000 );
+            }
+
+            /* Delete message queue */
+            msgctl( msgid, IPC_RMID, NULL );
         }
 
     }

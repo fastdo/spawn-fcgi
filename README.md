@@ -35,7 +35,7 @@
 
     spawn-manager new 9001
 
-以下命令列出监听在9001端口上的spawn-fcgi程序产生的FCGI子进程。
+以下命令列出监听在9001端口上的spawn-fcgi程序产生的FCGI子进程的PID。
 
     spawn-manager list 9001
 
