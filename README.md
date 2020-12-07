@@ -8,7 +8,7 @@
 # Programs
 ## spawn-fcgi
 ### 简介
-本spawn-fcgi程序基于[lighttpd/spawn-fcgi](https://github.com/lighttpd/spawn-fcgi)修改，感谢[jan kneschke](mailto:jan@kneschke.de)和[stefan bühler](mailto:lighttpd@stbuehler.de)两位[原作者](https://github.com/waiting/spawn-fcgi/blob/master/AUTHORS)。
+本spawn-fcgi程序基于[lighttpd/spawn-fcgi](https://github.com/lighttpd/spawn-fcgi)修改，感谢[jan kneschke](mailto:jan@kneschke.de)和[stefan bühler](mailto:lighttpd@stbuehler.de)两位[原作者](AUTHORS)。
 
 主要改变如下：
 - fcgi进程崩溃时取消core dump文件生成，改为自动启动新fcgi进程。
@@ -43,4 +43,4 @@
 
 
 # License
-本项目延续原[lighttpd/spawn-fcgi](https://github.com/lighttpd/spawn-fcgi)项目，采用[MIT许可证](https://github.com/waiting/spawn-fcgi/blob/master/LICENSE)，并保留原始spawn-fcgi[许可证](https://github.com/waiting/spawn-fcgi/blob/master/COPYING)。
+本项目延续原[lighttpd/spawn-fcgi](https://github.com/lighttpd/spawn-fcgi)项目，采用[MIT许可证](LICENSE)，并保留原始spawn-fcgi[许可证](COPYING)。
