@@ -1,20 +1,20 @@
-INCLUDE(CheckCSourceCompiles)
-INCLUDE(CheckIncludeFiles)
-INCLUDE(CheckFunctionExists)
-INCLUDE(CheckVariableExists)
-INCLUDE(CheckTypeSize)
-INCLUDE(CMakeDetermineCCompiler)
+include(CheckCSourceCompiles)
+include(CheckIncludeFiles)
+include(CheckFunctionExists)
+include(CheckVariableExists)
+include(CheckTypeSize)
+include(CMakeDetermineCCompiler)
 
-IF(CMAKE_COMPILER_IS_GNUCC)
-	OPTION(BUILD_EXTRA_WARNINGS "extra warnings")
+if(CMAKE_COMPILER_IS_GNUCC)
+	option(BUILD_EXTRA_WARNINGS "extra warnings")
 
-	IF(BUILD_EXTRA_WARNINGS)
-		SET(WARN_FLAGS "-g -O2 -g2 -Wall -Wmissing-declarations -Wdeclaration-after-statement -Wcast-align -Winline -Wsign-compare -Wnested-externs -Wpointer-arith -Wl,--as-needed -Wformat-security")
+	if(BUILD_EXTRA_WARNINGS)
+		set(WARN_FLAGS "-g -O2 -g2 -Wall -Wmissing-declarations -Wdeclaration-after-statement -Wcast-align -Winline -Wsign-compare -Wnested-externs -Wpointer-arith -Wl,--as-needed -Wformat-security")
 		# -Wno-pointer-sign -Werror -Wbad-function-cast -Wmissing-prototypes
-	ELSE(BUILD_EXTRA_WARNINGS)
-		SET(WARN_FLAGS "")
-	ENDIF(BUILD_EXTRA_WARNINGS)
-ENDIF(CMAKE_COMPILER_IS_GNUCC)
+	else(BUILD_EXTRA_WARNINGS)
+		set(WARN_FLAGS "")
+	endif(BUILD_EXTRA_WARNINGS)
+endif(CMAKE_COMPILER_IS_GNUCC)
 
 # awk '/#include <(.*)>/ { h = substr($2,2,length($2)-2); h2=toupper(h); gsub("\\.|\\/", "_", h2); printf "%s%s%s%s%s", "CHECK_INCLUDE_FILES(", h, " HAVE_", h2, ")\n" }' spawn-fcgi.c | sort
 CHECK_INCLUDE_FILES(arpa/inet.h HAVE_ARPA_INET_H)
@@ -52,21 +52,23 @@ CHECK_C_SOURCE_COMPILES("
 		return 0;
 	}" HAVE_IPV6)
 
-SET(CMAKE_EXTRA_INCLUDE_FILES sys/socket.h)
+set(CMAKE_EXTRA_INCLUDE_FILES sys/socket.h)
 CHECK_TYPE_SIZE(socklen_t HAVE_SOCKLEN_T)
-SET(CMAKE_EXTRA_INCLUDE_FILES)
+set(CMAKE_EXTRA_INCLUDE_FILES)
 
 ## Write out config.h
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
-ADD_DEFINITIONS(-DHAVE_CONFIG_H)
+add_executable(spawn-fcgi spawn-fcgi.c)
+add_executable(spawn-manager spawn-manager.c)
 
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+set_target_properties(spawn-fcgi spawn-manager PROPERTIES
+	COMPILE_DEFINITIONS "HAVE_CONFIG_H"
+	INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR};${CMAKE_CURRENT_SOURCE_DIR}"
+)
 
-ADD_EXECUTABLE(spawn-fcgi spawn-fcgi.c)
+if(CMAKE_COMPILER_IS_GNUCC)
+	set_target_properties(spawn-fcgi spawn-manager PROPERTIES COMPILE_FLAGS "-std=gnu99 ${WARN_FLAGS}")
+endif(CMAKE_COMPILER_IS_GNUCC)
 
-IF(CMAKE_COMPILER_IS_GNUCC)
-	SET_TARGET_PROPERTIES(spawn-fcgi PROPERTIES COMPILE_FLAGS "-std=gnu99 -Wall -g -Wshadow -W -pedantic -fPIC -D_GNU_SOURCE ${WARN_FLAGS}")
-ENDIF(CMAKE_COMPILER_IS_GNUCC)
-
-INSTALL(TARGETS spawn-fcgi DESTINATION bin)
+install(TARGETS spawn-fcgi spawn-manager DESTINATION "bin${INSTALL_SUB_PATH}")

@@ -1,20 +1,17 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 2.6.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 2.8.0 FATAL_ERROR)
 
-cmake_policy(VERSION 2.6.0)
+project(spawn-fcgi)
+set(PACKAGE_NAME ${CMAKE_PROJECT_NAME})
+set(PACKAGE_VERSION 1.6.3)
 
-PROJECT(spawn-fcgi)
-SET(PACKAGE_NAME ${CMAKE_PROJECT_NAME})
-SET(PACKAGE_VERSION 1.6.3)
-
-SET(CMAKE_MAN_DIR "share/man" CACHE STRING
-  "Install location for man pages (relative to prefix).")
-MARK_AS_ADVANCED(CMAKE_MAN_DIR)
+set(CMAKE_MAN_DIR "share/man" CACHE STRING "Install location for man pages (relative to prefix).")
+mark_as_advanced(CMAKE_MAN_DIR)
 
 # Set Default build type to RelWithDebInfo
-IF("${CMAKE_BUILD_TYPE}" STREQUAL "")
-	SET(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Choose the type of build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel." FORCE)
-ENDIF("${CMAKE_BUILD_TYPE}" STREQUAL "")
+if(CMAKE_BUILD_TYPE STREQUAL "")
+	set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Choose the type of build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel." FORCE)
+endif(CMAKE_BUILD_TYPE STREQUAL "")
 
-ADD_SUBDIRECTORY(src)
+add_subdirectory(src)
 
-INSTALL(FILES spawn-fcgi.1 DESTINATION ${CMAKE_MAN_DIR}/man1)
+install(FILES spawn-fcgi.1 DESTINATION ${CMAKE_MAN_DIR}/man1)
