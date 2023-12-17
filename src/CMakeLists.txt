@@ -71,4 +71,4 @@ if(CMAKE_COMPILER_IS_GNUCC)
 	set_target_properties(spawn-fcgi spawn-manager PROPERTIES COMPILE_FLAGS "-std=gnu99 ${WARN_FLAGS}")
 endif(CMAKE_COMPILER_IS_GNUCC)
 
-install(TARGETS spawn-fcgi spawn-manager DESTINATION "bin${INSTALL_SUB_PATH}")
+install(TARGETS spawn-fcgi spawn-manager DESTINATION "bin${CONFIG_SUB_PATH}")

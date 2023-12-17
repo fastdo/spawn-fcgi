@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 2.8.12 FATAL_ERROR)
 
 project(spawn-fcgi)
 set(PACKAGE_NAME ${CMAKE_PROJECT_NAME})
