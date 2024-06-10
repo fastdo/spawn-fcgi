@@ -138,6 +138,7 @@ struct sockaddr_un __un;
 int __fcgi_fd = -1;
 int __status = 0;
 int __stop = 0;
+char __path_env[1024] = { 0 }; // PATH environment
 /*------------- add and modified by WT end   ------------*/
 
 key_t get_msg_key()
@@ -911,6 +912,30 @@ int main( int argc, char **argv )
         }
     }
 
+    /* Write spawn-fcgi exe path to env:PATH */
+    if ( 1 )
+    {
+        char * path_env;
+        size_t n, i;
+        char exe_path[512] = "";
+        readlink( "/proc/self/exe", exe_path, sizeof(exe_path) );
+        i = n = strlen(exe_path);
+        i--;
+        while ( i > 0 && exe_path[i] != '/' ) i--;
+        if ( i > 0 ) exe_path[i] = '\0';
+
+        path_env = getenv("PATH");
+        path_env = path_env == NULL ? "" : path_env;
+
+        if ( !strstr( path_env, exe_path ) )
+        {
+            strcat(__path_env, "PATH=");
+            strcat(__path_env, path_env);
+            strcat(__path_env, ":");
+            strcat(__path_env, exe_path);
+            putenv(__path_env);
+        }
+    }
 
     if ( __i_am_root )
     {
